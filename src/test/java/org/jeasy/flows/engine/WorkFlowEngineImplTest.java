@@ -59,7 +59,11 @@ public class WorkFlowEngineImplTest {
         workFlowEngine.run(workFlow,workContext);
 
         // then
-        Mockito.verify(workFlow).call(workContext);
+        try {
+            Mockito.verify(workFlow).withWorkContext(workContext).call();
+        }catch (Exception e){
+
+        }
     }
 
     /**
@@ -162,7 +166,7 @@ public class WorkFlowEngineImplTest {
         assertThat(workReport.getStatus()).isEqualTo(WorkStatus.COMPLETED);
     }
 
-    static class PrintMessageWork implements Work {
+    static class PrintMessageWork extends Work {
 
         private String message;
 
@@ -174,14 +178,14 @@ public class WorkFlowEngineImplTest {
             return "print message work";
         }
 
-        public WorkReport call(WorkContext workContext) {
+        public WorkReport call() {
             System.out.println(message);
             return new DefaultWorkReport(WorkStatus.COMPLETED, workContext);
         }
 
     }
-    
-    static class WordCountWork implements Work {
+
+    static class WordCountWork extends Work {
 
         private int partition;
 
@@ -195,14 +199,14 @@ public class WorkFlowEngineImplTest {
         }
 
         @Override
-        public WorkReport call(WorkContext workContext) {
+        public WorkReport call() {
             String input = (String) workContext.get("partition" + partition);
             workContext.put("wordCountInPartition" + partition, input.split(" ").length);
             return new DefaultWorkReport(WorkStatus.COMPLETED, workContext);
         }
     }
-    
-    static class AggregateWordCountsWork implements Work {
+
+    static class AggregateWordCountsWork extends Work {
 
         @Override
         public String getName() {
@@ -210,7 +214,7 @@ public class WorkFlowEngineImplTest {
         }
 
         @Override
-        public WorkReport call(WorkContext workContext) {
+        public WorkReport call() {
             Set<Map.Entry<String, Object>> entrySet = workContext.getEntrySet();
             int sum = 0;
             for (Map.Entry<String, Object> entry : entrySet) {
@@ -223,7 +227,7 @@ public class WorkFlowEngineImplTest {
         }
     }
 
-    static class PrintWordCount implements Work {
+    static class PrintWordCount extends Work {
 
         @Override
         public String getName() {
@@ -231,7 +235,7 @@ public class WorkFlowEngineImplTest {
         }
 
         @Override
-        public WorkReport call(WorkContext workContext) {
+        public WorkReport call() {
             int totalCount = (int) workContext.get("totalCount");
             System.out.println(totalCount);
             return new DefaultWorkReport(WorkStatus.COMPLETED, workContext);

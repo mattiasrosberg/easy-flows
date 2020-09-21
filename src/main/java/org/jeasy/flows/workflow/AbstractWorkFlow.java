@@ -23,12 +23,15 @@
  */
 package org.jeasy.flows.workflow;
 
-abstract class AbstractWorkFlow implements WorkFlow {
+import org.jeasy.flows.work.WorkContext;
+
+abstract class AbstractWorkFlow extends WorkFlow {
 
     private String name;
 
-    AbstractWorkFlow(String name) {
+    AbstractWorkFlow(String name, WorkContext workContext) {
         this.name = name;
+        this.workContext = workContext;
     }
 
     public String getName() {

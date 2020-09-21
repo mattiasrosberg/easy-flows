@@ -35,17 +35,17 @@ import java.util.List;
 public class ParallelFlowTest {
 
     @Test
-    public void call() {
+    public void call() throws Exception{
         // given
         Work work1 = Mockito.mock(Work.class);
         Work work2 = Mockito.mock(Work.class);
         WorkContext workContext = Mockito.mock(WorkContext.class);
         ParallelFlowExecutor parallelFlowExecutor = Mockito.mock(ParallelFlowExecutor.class);
         List<Work> works = Arrays.asList(work1, work2);
-        ParallelFlow parallelFlow = new ParallelFlow("pf", works, parallelFlowExecutor);
+        ParallelFlow parallelFlow = new ParallelFlow("pf", works, parallelFlowExecutor, workContext);
 
         // when
-        ParallelFlowReport parallelFlowReport = parallelFlow.call(workContext);
+        ParallelFlowReport parallelFlowReport = (ParallelFlowReport) parallelFlow.withWorkContext(workContext).call();
 
         // then
         Assertions.assertThat(parallelFlowReport).isNotNull();

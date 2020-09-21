@@ -51,7 +51,7 @@ class ParallelFlowExecutor {
         // submit work units to be executed in parallel
         Map<Work, Future<WorkReport>> reportFutures = new HashMap<>();
         for (Work work : works) {
-            Future<WorkReport> reportFuture = workExecutor.submit(() -> work.call(workContext));
+            Future<WorkReport> reportFuture = workExecutor.submit(() -> work.withWorkContext(workContext).call());
             reportFutures.put(work, reportFuture);
         }
 

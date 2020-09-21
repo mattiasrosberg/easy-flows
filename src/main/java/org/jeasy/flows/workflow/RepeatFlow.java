@@ -23,13 +23,12 @@
  */
 package org.jeasy.flows.workflow;
 
-import org.jeasy.flows.work.NoOpWork;
-import org.jeasy.flows.work.Work;
-import org.jeasy.flows.work.WorkContext;
-import org.jeasy.flows.work.WorkReportPredicate;
-import org.jeasy.flows.work.WorkReport;
+import org.jeasy.flows.work.*;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * A repeat flow executes a work repeatedly until its report satisfies a given predicate.
@@ -40,9 +39,10 @@ public class RepeatFlow extends AbstractWorkFlow {
 
     private Work work;
     private WorkReportPredicate predicate;
+    private Future<WorkReport> workReportFuture;
 
-    RepeatFlow(String name, Work work, WorkReportPredicate predicate) {
-        super(name);
+    RepeatFlow(String name, Work work, WorkReportPredicate predicate, WorkContext workContext) {
+        super(name, workContext);
         this.work = work;
         this.predicate = predicate;
     }
@@ -50,12 +50,25 @@ public class RepeatFlow extends AbstractWorkFlow {
     /**
      * {@inheritDoc}
      */
-    public WorkReport call(WorkContext workContext) {
-        WorkReport workReport;
-        do {
-            workReport = work.call(workContext);
-        } while (predicate.apply(workReport));
-        return workReport;
+    public WorkReport call() {
+        WorkReport workReport = null;
+        ExecutorService executor = Executors.newFixedThreadPool(1);
+        try {
+            do {
+                workReportFuture = executor.submit(work.withWorkContext(workContext));
+                workReport = workReportFuture.get();
+            } while (predicate.apply(workReport));
+            return workReport;
+        } catch (Exception e) {
+            return new DefaultWorkReport(WorkStatus.FAILED, workContext, e);
+        }
+    }
+
+    public void terminate(boolean mayInterruptIfRunning) {
+        System.out.println("Terminating");
+        if(workReportFuture != null) {
+            workReportFuture.cancel(mayInterruptIfRunning);
+        }
     }
 
     public static class Builder {
@@ -63,11 +76,13 @@ public class RepeatFlow extends AbstractWorkFlow {
         private String name;
         private Work work;
         private WorkReportPredicate predicate;
+        private WorkContext workContext;
 
         private Builder() {
             this.name = UUID.randomUUID().toString();
             this.work = new NoOpWork();
             this.predicate = WorkReportPredicate.ALWAYS_FALSE;
+            this.workContext = new WorkContext();
         }
 
         public static RepeatFlow.Builder aNewRepeatFlow() {
@@ -93,8 +108,13 @@ public class RepeatFlow extends AbstractWorkFlow {
             return this;
         }
 
+        public RepeatFlow.Builder withWorkContext(WorkContext workContext) {
+            this.workContext = workContext;
+            return this;
+        }
+
         public RepeatFlow build() {
-            return new RepeatFlow(name, work, predicate);
+            return new RepeatFlow(name, work, predicate, workContext);
         }
     }
 }

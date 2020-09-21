@@ -37,8 +37,8 @@ public class NoOpWorkTest {
 	}
 
 	@Test
-	public void call() {
-		WorkReport workReport = work.call(new WorkContext());
+	public void call() throws Exception{
+		WorkReport workReport = work.withWorkContext(new WorkContext()).call();
 		Assert.assertNotNull(workReport);
 		Assertions.assertThat(workReport.getStatus()).isEqualTo(WorkStatus.COMPLETED);
 

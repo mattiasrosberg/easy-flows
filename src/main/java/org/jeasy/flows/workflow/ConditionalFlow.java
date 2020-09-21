@@ -23,13 +23,12 @@
  */
 package org.jeasy.flows.workflow;
 
-import org.jeasy.flows.work.NoOpWork;
-import org.jeasy.flows.work.Work;
-import org.jeasy.flows.work.WorkContext;
-import org.jeasy.flows.work.WorkReport;
-import org.jeasy.flows.work.WorkReportPredicate;
+import org.jeasy.flows.work.*;
 
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * A conditional flow is defined by 4 artifacts:
@@ -49,28 +48,45 @@ public class ConditionalFlow extends AbstractWorkFlow {
 
     private Work toExecute, nextOnPredicateSuccess, nextOnPredicateFailure;
     private WorkReportPredicate predicate;
+    private Future<WorkReport> futureWorkReport;
 
-    ConditionalFlow(String name, Work toExecute, Work nextOnPredicateSuccess, Work nextOnPredicateFailure, WorkReportPredicate predicate) {
-        super(name);
+    ConditionalFlow(String name, Work toExecute, Work nextOnPredicateSuccess, Work nextOnPredicateFailure, WorkReportPredicate predicate, WorkContext workContext) {
+        super(name, workContext);
         this.toExecute = toExecute;
         this.nextOnPredicateSuccess = nextOnPredicateSuccess;
         this.nextOnPredicateFailure = nextOnPredicateFailure;
         this.predicate = predicate;
+        this.workContext = workContext;
     }
 
     /**
      * {@inheritDoc}
      */
-    public WorkReport call(WorkContext workContext) {
-        WorkReport jobReport = toExecute.call(workContext);
-        if (predicate.apply(jobReport)) {
-            jobReport = nextOnPredicateSuccess.call(workContext);
-        } else {
-            if (nextOnPredicateFailure != null && !(nextOnPredicateFailure instanceof NoOpWork)) { // else is optional
-                jobReport = nextOnPredicateFailure.call(workContext);
+    public WorkReport call() {
+        try {
+            ExecutorService executor = Executors.newFixedThreadPool(1);
+            futureWorkReport = executor.submit(toExecute.withWorkContext(workContext));
+            WorkReport jobReport = futureWorkReport.get();
+            if (predicate.apply(jobReport)) {
+                futureWorkReport = executor.submit(nextOnPredicateSuccess.withWorkContext(workContext));
+                jobReport = futureWorkReport.get();
+            } else {
+                if (nextOnPredicateFailure != null && !(nextOnPredicateFailure instanceof NoOpWork)) { // else is optional
+                    futureWorkReport = executor.submit(nextOnPredicateFailure.withWorkContext(workContext));
+                    jobReport = futureWorkReport.get();
+                }
             }
+            return jobReport;
+        }catch (Exception e){
+            return new DefaultWorkReport(WorkStatus.FAILED, workContext, e);
         }
-        return jobReport;
+    }
+
+    public void terminate(boolean mayInterruptIfRunning) {
+        System.out.println("Terminating");
+        if(futureWorkReport != null) {
+            futureWorkReport.cancel(mayInterruptIfRunning);
+        }
     }
 
     public static class Builder {
@@ -78,6 +94,7 @@ public class ConditionalFlow extends AbstractWorkFlow {
         private String name;
         private Work toExecute, nextOnPredicateSuccess, nextOnPredicateFailure;
         private WorkReportPredicate predicate;
+        private WorkContext workContext;
 
         private Builder() {
             this.name = UUID.randomUUID().toString();
@@ -85,6 +102,7 @@ public class ConditionalFlow extends AbstractWorkFlow {
             this.nextOnPredicateSuccess = new NoOpWork();
             this.nextOnPredicateFailure = new NoOpWork();
             this.predicate = WorkReportPredicate.ALWAYS_FALSE;
+            this.workContext = new WorkContext();
         }
 
         public static ConditionalFlow.Builder aNewConditionalFlow() {
@@ -116,8 +134,13 @@ public class ConditionalFlow extends AbstractWorkFlow {
             return this;
         }
 
+        public ConditionalFlow.Builder withWorkContext(WorkContext workContext) {
+            this.workContext = workContext;
+            return this;
+        }
+
         public ConditionalFlow build() {
-            return new ConditionalFlow(name, toExecute, nextOnPredicateSuccess, nextOnPredicateFailure, predicate);
+            return new ConditionalFlow(name, toExecute, nextOnPredicateSuccess, nextOnPredicateFailure, predicate, workContext);
         }
     }
 }

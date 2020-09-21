@@ -59,7 +59,7 @@ public class ParallelFlowExecutorTest {
         Assertions.assertThat(work2.isExecuted()).isTrue();
     }
 
-    static class HelloWorldWork implements Work {
+    static class HelloWorldWork extends Work {
 
         private String name;
         private WorkStatus status;
@@ -76,7 +76,7 @@ public class ParallelFlowExecutorTest {
         }
 
         @Override
-        public WorkReport call(WorkContext workContext) {
+        public WorkReport call() {
             executed = true;
             return new DefaultWorkReport(status, workContext);
         }

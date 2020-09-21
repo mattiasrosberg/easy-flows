@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
  * A parallel flow executes a set of work units in parallel. A {@link ParallelFlow}
  * requires a {@link ExecutorService} to run work units in parallel using multiple
  * threads.
- * 
+ *
  * <strong>It is the responsibility of the caller to manage the lifecycle of the
  * executor service.</strong>
  *
@@ -55,8 +55,8 @@ public class ParallelFlow extends AbstractWorkFlow {
     private List<Work> works = new ArrayList<>();
     private ParallelFlowExecutor workExecutor;
 
-    ParallelFlow(String name, List<Work> works, ParallelFlowExecutor parallelFlowExecutor) {
-        super(name);
+    ParallelFlow(String name, List<Work> works, ParallelFlowExecutor parallelFlowExecutor, WorkContext workContext) {
+        super(name, workContext);
         this.works.addAll(works);
         this.workExecutor = parallelFlowExecutor;
     }
@@ -64,7 +64,7 @@ public class ParallelFlow extends AbstractWorkFlow {
     /**
      * {@inheritDoc}
      */
-    public ParallelFlowReport call(WorkContext workContext) {
+    public ParallelFlowReport call() {
         ParallelFlowReport workFlowReport = new ParallelFlowReport();
         List<WorkReport> workReports = workExecutor.executeInParallel(works, workContext);
         workFlowReport.addAll(workReports);
@@ -76,21 +76,23 @@ public class ParallelFlow extends AbstractWorkFlow {
         private String name;
         private List<Work> works;
         private ExecutorService executorService;
+        private WorkContext workContext;
 
         private Builder(ExecutorService executorService) {
             this.name = UUID.randomUUID().toString();
             this.works = new ArrayList<>();
             this.executorService = executorService;
+            this.workContext = new WorkContext();
         }
 
         /**
          *  Create a new {@link ParallelFlow} builder. A {@link ParallelFlow}
          *  requires a {@link ExecutorService} to run work units in parallel
          *  using multiple threads.
-         *  
+         *
          *  <strong>It is the responsibility of the caller to manage the lifecycle
          *  of the executor service.</strong>
-         *  
+         *
          * @param executorService to use to run work units in parallel
          * @return a new {@link ParallelFlow} builder
          */
@@ -108,8 +110,13 @@ public class ParallelFlow extends AbstractWorkFlow {
             return this;
         }
 
+        public ParallelFlow.Builder withContext(WorkContext workContext) {
+            this.workContext = workContext;
+            return this;
+        }
+
         public ParallelFlow build() {
-            return new ParallelFlow(name, works, new ParallelFlowExecutor(executorService));
+            return new ParallelFlow(name, works, new ParallelFlowExecutor(executorService), workContext);
         }
     }
 }

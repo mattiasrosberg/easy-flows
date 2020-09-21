@@ -23,8 +23,10 @@
  */
 package org.jeasy.flows.engine;
 
+import org.jeasy.flows.work.DefaultWorkReport;
 import org.jeasy.flows.work.WorkContext;
 import org.jeasy.flows.work.WorkReport;
+import org.jeasy.flows.work.WorkStatus;
 import org.jeasy.flows.workflow.WorkFlow;
 
 import java.util.logging.Level;
@@ -35,8 +37,12 @@ class WorkFlowEngineImpl implements WorkFlowEngine {
     private static final Logger LOGGER = Logger.getLogger(WorkFlowEngineImpl.class.getName());
 
     public WorkReport run(WorkFlow workFlow, WorkContext workContext) {
-        LOGGER.log(Level.INFO, "Running workflow ''{0}''", workFlow.getName());
-        return workFlow.call(workContext);
+        try {
+            LOGGER.log(Level.INFO, "Running workflow ''{0}''", workFlow.getName());
+            return workFlow.withWorkContext(workContext).call();
+        }catch (Exception e){
+            return new DefaultWorkReport(WorkStatus.FAILED, workContext, e);
+        }
     }
 
 }

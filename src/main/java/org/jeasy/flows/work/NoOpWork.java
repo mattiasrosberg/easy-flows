@@ -30,7 +30,7 @@ import java.util.UUID;
  *
  * @author Mahmoud Ben Hassine (mahmoud.benhassine@icloud.com)
  */
-public class NoOpWork implements Work {
+public class NoOpWork extends Work {
 
     @Override
     public String getName() {
@@ -38,7 +38,7 @@ public class NoOpWork implements Work {
     }
 
     @Override
-    public WorkReport call(WorkContext workContext) {
+    public WorkReport call() {
         return new DefaultWorkReport(WorkStatus.COMPLETED, workContext);
     }
 }

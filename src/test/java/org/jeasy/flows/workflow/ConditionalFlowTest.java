@@ -29,10 +29,12 @@ import org.jeasy.flows.work.WorkReportPredicate;
 import org.junit.Test;
 import org.mockito.Mockito;
 
+import static org.mockito.Mockito.when;
+
 public class ConditionalFlowTest {
 
     @Test
-    public void callOnPredicateSuccess() {
+    public void callOnPredicateSuccess() throws Exception {
         // given
         Work toExecute = Mockito.mock(Work.class);
         Work nextOnPredicateSuccess = Mockito.mock(Work.class);
@@ -45,19 +47,23 @@ public class ConditionalFlowTest {
                 .when(predicate)
                 .then(nextOnPredicateSuccess)
                 .otherwise(nextOnPredicateFailure)
+                .withWorkContext(workContext)
                 .build();
 
         // when
-        conditionalFlow.call(workContext);
+        when(toExecute.withWorkContext(workContext)).thenReturn(toExecute);
+        when(nextOnPredicateFailure.withWorkContext(workContext)).thenReturn(nextOnPredicateFailure);
+        when(nextOnPredicateSuccess.withWorkContext(workContext)).thenReturn(nextOnPredicateSuccess);
+        conditionalFlow.call();
 
         // then
-        Mockito.verify(toExecute, Mockito.times(1)).call(workContext);
-        Mockito.verify(nextOnPredicateSuccess, Mockito.times(1)).call(workContext);
-        Mockito.verify(nextOnPredicateFailure, Mockito.never()).call(workContext);
+        Mockito.verify(toExecute, Mockito.times(1)).call();
+        Mockito.verify(nextOnPredicateSuccess, Mockito.times(1)).call();
+        Mockito.verify(nextOnPredicateFailure, Mockito.never()).call();
     }
 
     @Test
-    public void callOnPredicateFailure() {
+    public void callOnPredicateFailure() throws Exception {
         // given
         Work toExecute = Mockito.mock(Work.class);
         Work nextOnPredicateSuccess = Mockito.mock(Work.class);
@@ -70,15 +76,19 @@ public class ConditionalFlowTest {
                 .when(predicate)
                 .then(nextOnPredicateSuccess)
                 .otherwise(nextOnPredicateFailure)
+                .withWorkContext(workContext)
                 .build();
 
         // when
-        conditionalFlow.call(workContext);
+        when(toExecute.withWorkContext(workContext)).thenReturn(toExecute);
+        when(nextOnPredicateFailure.withWorkContext(workContext)).thenReturn(nextOnPredicateFailure);
+        when(nextOnPredicateSuccess.withWorkContext(workContext)).thenReturn(nextOnPredicateSuccess);
+        conditionalFlow.call();
 
         // then
-        Mockito.verify(toExecute, Mockito.times(1)).call(workContext);
-        Mockito.verify(nextOnPredicateFailure, Mockito.times(1)).call(workContext);
-        Mockito.verify(nextOnPredicateSuccess, Mockito.never()).call(workContext);
+        Mockito.verify(toExecute, Mockito.times(1)).call();
+        Mockito.verify(nextOnPredicateFailure, Mockito.times(1)).call();
+        Mockito.verify(nextOnPredicateSuccess, Mockito.never()).call();
     }
 
 }

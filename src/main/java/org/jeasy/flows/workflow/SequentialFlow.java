@@ -23,6 +23,7 @@
  */
 package org.jeasy.flows.workflow;
 
+import org.jeasy.flows.work.DefaultWorkReport;
 import org.jeasy.flows.work.Work;
 import org.jeasy.flows.work.WorkContext;
 import org.jeasy.flows.work.WorkReport;
@@ -30,14 +31,18 @@ import org.jeasy.flows.work.WorkReport;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static org.jeasy.flows.work.WorkStatus.FAILED;
+import static org.jeasy.flows.work.WorkStatus.*;
 
 /**
  * A sequential flow executes a set of work units in sequence.
- *
+ * <p>
  * If a init of work fails, next work units in the pipeline will be skipped.
  *
  * @author Mahmoud Ben Hassine (mahmoud.benhassine@icloud.com)
@@ -48,34 +53,66 @@ public class SequentialFlow extends AbstractWorkFlow {
 
     private List<Work> works = new ArrayList<>();
 
-    SequentialFlow(String name, List<Work> works) {
-        super(name);
+    private List<Future<WorkReport>> futureWorkReportList = new ArrayList<>();
+
+    SequentialFlow(String name, List<Work> works, WorkContext workContext) {
+        super(name, workContext);
         this.works.addAll(works);
     }
 
     /**
      * {@inheritDoc}
      */
-    public WorkReport call(WorkContext workContext) {
+    public WorkReport call() {
         WorkReport workReport = null;
-        for (Work work : works) {
-            workReport = work.call(workContext);
-            if (workReport != null && FAILED.equals(workReport.getStatus())) {
-                LOGGER.log(Level.INFO, "Work unit ''{0}'' has failed, skipping subsequent work units", work.getName());
-                break;
+        try {
+            ExecutorService executor = Executors.newFixedThreadPool(1);
+
+            works.forEach(work -> futureWorkReportList.add(executor.submit(work.withWorkContext(workContext))));
+
+            for (int a = 0; a < futureWorkReportList.size(); a++) {
+                try {
+                    workReport = futureWorkReportList.get(a).get();
+                    if (FAILED.equals(futureWorkReportList.get(a).get().getStatus())) {
+                        LOGGER.log(Level.INFO, "Work unit ''{0}'' has failed, skipping subsequent work units", works.get(a).getName());
+                        break;
+                    }
+                } catch (CancellationException ce) {
+                    LOGGER.log(Level.INFO, "Type: " + ce.getClass().getName() + "   Message: " + ce.getMessage());
+                    workReport = new DefaultWorkReport(TERMINATED, workContext, ce);
+                    return workReport;
+                } catch (Exception e) {
+                    LOGGER.log(Level.INFO, "Work unit ''{0}'' has failed, skipping subsequent work units...", "TODO");
+                    workReport = new DefaultWorkReport(FAILED, workContext, e);
+                    return workReport;
+                }
             }
+            return workReport;
+        } catch (Exception e) {
+            LOGGER.log(Level.INFO, "Work unit ''{0}'' has failed, skipping subsequent work units...", "TODO");
+            workReport = new DefaultWorkReport(FAILED, workContext, e);
+            return workReport;
         }
-        return workReport;
+    }
+
+    public void terminate(boolean mayInterruptIfRunning) {
+        futureWorkReportList.forEach(futureWorkReport -> futureWorkReport.cancel(mayInterruptIfRunning));
+    }
+
+    public List<Future<WorkReport>> getFutureWorkReportList() {
+        return futureWorkReportList;
     }
 
     public static class Builder {
 
         private String name;
         private List<Work> works;
+        private WorkContext workContext;
 
         private Builder() {
             this.name = UUID.randomUUID().toString();
             this.works = new ArrayList<>();
+            this.workContext = new WorkContext();
         }
 
         public static SequentialFlow.Builder aNewSequentialFlow() {
@@ -84,6 +121,11 @@ public class SequentialFlow extends AbstractWorkFlow {
 
         public SequentialFlow.Builder named(String name) {
             this.name = name;
+            return this;
+        }
+
+        public SequentialFlow.Builder withWorkContext(WorkContext workContext) {
+            this.workContext = workContext;
             return this;
         }
 
@@ -98,7 +140,7 @@ public class SequentialFlow extends AbstractWorkFlow {
         }
 
         public SequentialFlow build() {
-            return new SequentialFlow(name, works);
+            return new SequentialFlow(name, works, workContext);
         }
     }
 }
